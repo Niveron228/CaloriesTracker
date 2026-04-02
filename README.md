@@ -37,14 +37,14 @@ This project demonstrates the use of relational databases, integration with thir
 2. **Configure "appsettings.json":**
 ```json
 {
-  &quot;Jwt&quot;: {
-    &quot;Key&quot;: &quot;your_super_secret_and_long_key_here&quot;,
-    &quot;Issuer&quot;: &quot;CaloriesTrackerServer&quot;,
-    &quot;Audience&quot;: &quot;CaloriesTrackerUsers&quot;
+  "Jwt": {
+    "Key": "your_super_secret_and_long_key_here",
+    "Issuer": "CaloriesTrackerServer",
+    "Audience": "CaloriesTrackerUsers"
   },
-  &quot;FatSecret&quot;: {
-    &quot;ClientId&quot;: &quot;your_fatsecret_client_id&quot;,
-    &quot;ClientSecret&quot;: &quot;your_fatsecret_client_secret&quot;
+  "FatSecret": {
+    "ClientId": "your_fatsecret_client_id",
+    "ClientSecret": "your_fatsecret_client_secret"
   }
 }
 ```
