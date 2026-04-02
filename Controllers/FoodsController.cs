@@ -299,7 +299,7 @@ namespace CaloriesTracker.Controllers
             return NoContent();
         }
 
-
+        // custom method to get and save list of objects from external api 
         private async Task SaveExternalListToDb(List<ExternalFoodDto> externalList)
         {
             foreach (var externalItem in externalList)
