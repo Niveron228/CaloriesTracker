@@ -31,6 +31,7 @@ namespace CaloriesTracker.Controllers
             return Ok(await _context.Foods.AsNoTracking().ToArrayAsync());
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetItemById(int id)
         {
@@ -69,8 +70,8 @@ namespace CaloriesTracker.Controllers
 
             return Ok(newlySavedFood);
         }
-        
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("external/search/{name}")]
         public async Task<IActionResult> SearchExternalFood(string name)
         {
@@ -83,6 +84,7 @@ namespace CaloriesTracker.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> AddNewItem([FromBody] Foods newItem)
         {
@@ -101,6 +103,7 @@ namespace CaloriesTracker.Controllers
             return 0;
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("import")]
         public async Task<IActionResult> ImportExternalFood([FromBody] ExternalFoodDto dto)
         {
@@ -132,6 +135,7 @@ namespace CaloriesTracker.Controllers
             return Ok(newLocalFood);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateItem(int id, [FromBody] Foods updatedItem)
         {
@@ -150,6 +154,7 @@ namespace CaloriesTracker.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPatch("{id}")]
         public async Task<IActionResult> PatchItem(int id,[FromBody]JsonPatchDocument<Foods> patchedItem)
         {
@@ -169,6 +174,7 @@ namespace CaloriesTracker.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteItem(int id)
         {

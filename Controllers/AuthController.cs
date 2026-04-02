@@ -42,11 +42,19 @@ namespace CaloriesTracker.Controllers
 
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.password);
 
+            string assignedRole = "User";
+
+            if(request.email.ToLower() == "admin123@test.com")
+            {
+                assignedRole = "Admin";
+            }
+
             // create new user with that email and hashed password
             var user = new Users
             {
                 email = request.email,
-                passwordHash = passwordHash
+                passwordHash = passwordHash,
+                Role = assignedRole
             };
 
             // add new user in table save and return success code status
@@ -54,7 +62,7 @@ namespace CaloriesTracker.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Success Registration!" });
+            return Ok(new { message = $"Success Registration!, Your role is: {user.Role}" });
         }
 
         [HttpPost("login")]
@@ -82,7 +90,17 @@ namespace CaloriesTracker.Controllers
 
             string token = CreateToken(user);
 
-            return Ok(new { message = $"Welcome back {user.email}!, your token: {token}" });
+            // token settings for cookies
+            var cookieOption = new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = DateTime.Now.AddDays(1)
+            };
+
+            // putting token in cookies
+            Response.Cookies.Append("jwt", token, cookieOption);
+
+            return Ok(new { message = $"Welcome back {user.email}!, your token saved automatically in cookies!" });
         }
 
         // create token method
@@ -98,7 +116,8 @@ namespace CaloriesTracker.Controllers
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier,user.Id.ToString()),
-                new Claim(ClaimTypes.Email,user.email)
+                new Claim(ClaimTypes.Email,user.email),
+                new Claim(ClaimTypes.Role,user.Role)
             };
 
             // creating token
