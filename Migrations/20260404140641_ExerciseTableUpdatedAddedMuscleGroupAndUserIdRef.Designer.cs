@@ -3,6 +3,7 @@ using System;
 using CaloriesTracker.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CaloriesTracker.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class FoodsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260404140641_ExerciseTableUpdatedAddedMuscleGroupAndUserIdRef")]
+    partial class ExerciseTableUpdatedAddedMuscleGroupAndUserIdRef
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
@@ -218,7 +221,7 @@ namespace CaloriesTracker.Migrations
                         .IsRequired();
 
                     b.HasOne("CaloriesTracker.Models.Workout", "Workout")
-                        .WithMany("WorkoutSets")
+                        .WithMany()
                         .HasForeignKey("WorkoutId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -226,11 +229,6 @@ namespace CaloriesTracker.Migrations
                     b.Navigation("Exercise");
 
                     b.Navigation("Workout");
-                });
-
-            modelBuilder.Entity("CaloriesTracker.Models.Workout", b =>
-                {
-                    b.Navigation("WorkoutSets");
                 });
 #pragma warning restore 612, 618
         }

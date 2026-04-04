@@ -15,6 +15,10 @@ namespace CaloriesTracker.DB
 
         public DbSet<MealLog> mealLogs { get; set; }
 
+        public DbSet<Workout> workouts { get; set; }
+        public DbSet<Exercise> exercises { get; set; }
+        public DbSet<WorkoutSet> workoutsSet { get; set; }
+
 
     }
 }
