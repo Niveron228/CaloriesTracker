@@ -19,6 +19,23 @@ namespace CaloriesTracker.Controllers
         {
             _context = context;
         }
+        [HttpGet("exercises")]
+        public async Task<IActionResult> GetExercises()
+        {
+            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+
+            var exercises = await _context.exercises
+                .Where(e => e.UserId == null || e.UserId == userId)
+                .Select(e => new
+                {
+                    e.Id,
+                    e.Name,
+                    e.MuscleGroup
+                })
+                .ToListAsync();
+
+            return Ok(exercises);
+        }
 
         [HttpPost("add-set")]
         public async Task<IActionResult> AddSet([FromBody] AddWorkoutSetDto request)
@@ -32,15 +49,27 @@ namespace CaloriesTracker.Controllers
             }
             else
             {
-                var newEx = new Exercise
+                var existingCustomEx = await _context.exercises
+                    .FirstOrDefaultAsync(e => e.UserId == userId && e.Name.ToLower() == request.NewExerciseName.ToLower() && e.MuscleGroup == request.MuscleGroup);
+
+                if (existingCustomEx != null)
                 {
-                    Name = request.NewExerciseName,
-                    MuscleGroup = request.MuscleGroup,
-                    UserId = userId
-                };
-                _context.exercises.Add(newEx);
-                await _context.SaveChangesAsync();
-                finalExerciseId = newEx.Id;
+                    finalExerciseId = existingCustomEx.Id;
+                }
+
+                else 
+                {
+                    var newEx = new Exercise
+                    {
+                        Name = request.NewExerciseName,
+                        MuscleGroup = request.MuscleGroup,
+                        UserId = userId
+                    };
+                    _context.exercises.Add(newEx);
+                    await _context.SaveChangesAsync();
+                    finalExerciseId = newEx.Id;
+                }
+
             }
 
             var workout = await _context.workouts.FirstOrDefaultAsync(w => w.UserId == userId && w.Date.Date == request.Date.Date);
@@ -88,6 +117,7 @@ namespace CaloriesTracker.Controllers
             var result = workout.WorkoutSets.Select(s => new WorkoutHistoryResponse
             {
                 SetId = s.Id,
+                ExerciseId = s.ExerciseId,
                 ExerciseName = s.Exercise.Name,
                 MuscleGroup = s.Exercise.MuscleGroup,
                 Weight = s.Weight,
@@ -97,5 +127,25 @@ namespace CaloriesTracker.Controllers
 
             return Ok(result);
         }
+
+        [HttpDelete("delete-set/{setId}")]
+        public async Task<IActionResult> DeleteSet(int setId)
+        {
+            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+
+            var workoutSet = await _context.workoutsSet
+                .Include(ws => ws.Workout)
+                .FirstOrDefaultAsync(ws => ws.Id == setId && ws.Workout.UserId == userId);
+            if (workoutSet == null)
+            {
+                return NotFound(new { Message = "Set not found or you don't have access to remove it!" });
+            }
+
+            _context.workoutsSet.Remove(workoutSet);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Set removed!" });
+        }
+
     }
 }

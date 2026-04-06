@@ -18,6 +18,20 @@ namespace CaloriesTracker.DB
         public DbSet<Workout> workouts { get; set; }
         public DbSet<Exercise> exercises { get; set; }
         public DbSet<WorkoutSet> workoutsSet { get; set; }
+        public DbSet<UserProfile> userProfiles { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<UserProfile>().ToTable("userProfiles");
+
+            modelBuilder.Entity<UserProfile>()
+                .HasOne(p => p.User)
+                .WithOne()
+                .HasForeignKey<UserProfile>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
 
 
     }

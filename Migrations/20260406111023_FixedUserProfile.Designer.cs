@@ -3,6 +3,7 @@ using System;
 using CaloriesTracker.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CaloriesTracker.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class FoodsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260406111023_FixedUserProfile")]
+    partial class FixedUserProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
