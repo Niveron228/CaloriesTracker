@@ -1,17 +1,24 @@
-﻿using CaloriesTracker.DTOs;
-using System.Text.Json;
+﻿using CaloriesTracker.DB;
+using CaloriesTracker.DTOs;
+using CaloriesTracker.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Net.Http.Headers;
-namespace CaloriesTracker.Services
+using System.Text.Json;
+using System.Text.RegularExpressions;
+namespace CaloriesTracker.Services.FoodsServices
 {
-    public class FoodApiService : IFoodApiService
+    public class ApiService : IFoodApiService
     { 
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
         private string _accessToken = string.Empty;
-        public FoodApiService(HttpClient httpClient, IConfiguration config)
+        private readonly AppDbContext _context;
+        public ApiService(HttpClient httpClient, IConfiguration config, AppDbContext context)
         {
             _httpClient = httpClient;
             _config = config;
+            _context = context;
         }
 
         private async Task<string> GetAccessTokenAsync()
@@ -97,6 +104,53 @@ namespace CaloriesTracker.Services
             }
 
             return resultList;
+        }
+
+        public double ParseNutritionValue(string description, string key)
+        {
+            var match = Regex.Match(description, $@"{key}:\s*([\d\.]+)", RegexOptions.IgnoreCase);
+            if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double value))
+            {
+                return value;
+            }
+            return 0;
+        }
+
+        public async Task<Foods?> ImportExternalFoodAsync(ExternalFoodDto dto)
+        {
+            var existingFood = await _context.Foods.FirstOrDefaultAsync(f => f.name.ToLower() == dto.Name.ToLower());
+
+            if (existingFood != null)
+            {
+                return null;
+            }
+
+            double cal = ParseNutritionValue(dto.Description, "Calories");
+            double p = ParseNutritionValue(dto.Description, "Protein");
+            double f = ParseNutritionValue(dto.Description, "Fat");
+            double c = ParseNutritionValue(dto.Description, "Carbs");
+
+            var newLocalFood = new Foods
+            {
+                name = dto.Name,
+                calories = Convert.ToInt32(cal),
+                protein = Convert.ToInt32(p),
+                fats = Convert.ToInt32(f),
+                carbs = Convert.ToInt32(c)
+            };
+
+            await _context.Foods.AddAsync(newLocalFood);
+            await _context.SaveChangesAsync();
+
+            return newLocalFood;
+        }
+
+        public async Task SaveExternalListToDbAsync(List<ExternalFoodDto> externalList)
+        {
+            foreach (var externalItem in externalList)
+            {
+                await ImportExternalFoodAsync(externalItem);
+            }
         }
 
     }

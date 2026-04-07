@@ -10,6 +10,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using CaloriesTracker.Services.AuthService;
 
 namespace CaloriesTracker.Controllers
 {
@@ -19,61 +20,40 @@ namespace CaloriesTracker.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IAuthService _authService;
 
-        public AuthController(AppDbContext context, IConfiguration config)
+        public AuthController(AppDbContext context, IConfiguration config, IAuthService authService)
         {
             _context = context;
             _config = config;
+            _authService = authService;
         }
+
+        // POST
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] UserRegisterDto request)
         {
-            if (await _context.Users.AnyAsync(u => u.email == request.email))
+            var result = await _authService.RegisterAsync(request);
+
+            if (!result.IsSuccess)
             {
-                return BadRequest("User with this email already exist.");
+                return BadRequest(result.Message);
             }
 
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.password);
-
-            string assignedRole = "User";
-
-            if(request.email.ToLower() == "admin123@test.com")
-            {
-                assignedRole = "Admin";
-            }
-
-            var user = new Users
-            {
-                email = request.email,
-                passwordHash = passwordHash,
-                Role = assignedRole
-            };
-
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = $"Success Registration!, Your role is: {user.Role}" });
+            return Ok(new { message = result.Message });
         }
 
         [HttpPost("login")]
 
         public async Task<IActionResult> Login([FromBody] UserLoginDto request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.email == request.email);
-            if(user == null)
+            var result = await _authService.LoginAsync(request);
+
+            if (!result.IsSuccess)
             {
-                return BadRequest("Incorrect email");
+                return BadRequest(result.Message);
             }
-
-            if(!BCrypt.Net.BCrypt.Verify(request.password, user.passwordHash))
-            {
-                return BadRequest("Incorrect Email or password!");
-            }
-
-
-            string token = CreateToken(user);
 
             var cookieOption = new CookieOptions
             {
@@ -83,31 +63,9 @@ namespace CaloriesTracker.Controllers
                 Expires = DateTime.Now.AddDays(1)
             };
 
-            Response.Cookies.Append("jwt", token, cookieOption);
+            Response.Cookies.Append("jwt", result.Token, cookieOption);
 
-            return Ok(new { message = $"Welcome back {user.email}!, your token saved automatically in cookies!"});
-        }
-
-        private string CreateToken(Users user)
-        {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Token"]));
-
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier,user.Id.ToString()),
-                new Claim(ClaimTypes.Email,user.email),
-                new Claim(ClaimTypes.Role,user.Role)
-            };
-
-            var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddDays(1),
-                signingCredentials: creds
-                );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return Ok(new { message = result.Message });
         }
     }
 }

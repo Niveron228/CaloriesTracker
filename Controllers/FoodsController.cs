@@ -3,11 +3,11 @@ using CaloriesTracker.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.JsonPatch;
-using CaloriesTracker.Services;
 using System.Text.RegularExpressions;
 using System.Globalization;
 using CaloriesTracker.DTOs;
 using Microsoft.AspNetCore.Authorization;
+using CaloriesTracker.Services.FoodsServices;
 
 namespace CaloriesTracker.Controllers
 {
@@ -18,55 +18,41 @@ namespace CaloriesTracker.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IFoodApiService _foodApiService;
+        private readonly IFoodService _foodService;
+        private IMealLogService _mealLogService;
 
-        public FoodsController(AppDbContext context, IFoodApiService foodApiService)
+        public FoodsController(AppDbContext context, IFoodApiService foodApiService,IFoodService foodService, IMealLogService mealLogService)
         {
             _context = context;
             _foodApiService = foodApiService;
+            _foodService = foodService;
+            _mealLogService = mealLogService;
         }
+
+        // GET
 
         [HttpGet]
         public async Task<IActionResult> GetAllItems()
         {
-            return Ok(await _context.Foods.AsNoTracking().ToArrayAsync());
+            var items = await _foodService.GetAllItemsAsync();
+            return Ok(items);
         }
 
         [Authorize(Roles = "Admin")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetItemById(int id)
         {
-            var food = await _context.Foods.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
-            if (food == null)
-            {
-                return NotFound();
-            }
-            return Ok(food);
+            var item = await _foodService.GetItemByIdAsync(id);
+            if (item == null) return NotFound("Food not found");
+            return Ok(item);
         }
 
         [HttpGet("search/{name}")]
         public async Task<IActionResult> GetItemByName(string name)
         {
-            var searchTerm = name.ToLower();
-
-            var exactMatch = await _context.Foods.AsNoTracking().FirstOrDefaultAsync(f => f.name.ToLower() == searchTerm);
-
-            if(exactMatch == null)
-            {
-                var externalList = await _foodApiService.SearchFoodAsync(name);
-
-                if (externalList != null && externalList.Any())
-                {
-                    await SaveExternalListToDb(externalList);
-                }
-            }
-
-            var allMatches = await _context.Foods
-                .AsNoTracking()
-                .Where(i => i.name.ToLower()
-                .Contains(searchTerm))
-                .ToListAsync();
-
-            return allMatches.Any() ? Ok(allMatches) : NotFound("Not found in local and external databases");
+            var items = await _foodService.GetItemByNameAsync(name);
+            if (items == null || items.Count == 0) return NotFound("Food not found");
+            return Ok(items);
         }
 
         [HttpGet("daily-stats/{date}")]
@@ -76,55 +62,8 @@ namespace CaloriesTracker.Controllers
             if (userIdClaim == null) return Unauthorized();
             int currentUserId = int.Parse(userIdClaim.Value);
 
-            var logs = await _context.mealLogs
-                .Include(m => m.Food)
-                .Where(m => m.UserId == currentUserId
-                && m.LogDate >= date.Date
-                && m.LogDate < date.Date.AddDays(1))
-                .ToListAsync();
-
-            var report = Enum.GetValues(typeof(MealLog.MealType))
-                .Cast<MealLog.MealType>()
-                .Select(type =>
-                {
-                    var mealItems = logs.Where(l => l.Type == type).ToList();
-
-                    return new
-                    {
-                        MealName = type.ToString(),
-                        TotalCalories = Math.Round(mealItems.Sum(i => (i.Food.calories * i.Grams) / 100), 1),
-                        TotalProtein = Math.Round(mealItems.Sum(i => (i.Food.protein * i.Grams) / 100), 1),
-                        TotalFat = Math.Round(mealItems.Sum(i => (i.Food.fats * i.Grams) / 100), 1),
-                        TotalCarbs = Math.Round(mealItems.Sum(i => (i.Food.carbs * i.Grams) / 100), 1),
-                        ItemsCount = mealItems.Count,
-
-                        Items = mealItems.Select(item => new
-                        {
-                            Id = item.Id,
-                            Name = item.Food.name,
-                            Grams = item.Grams,
-                            Calories = Math.Round((item.Food.calories * item.Grams) / 100, 1),
-                            Protein = Math.Round((item.Food.protein * item.Grams) / 100, 1),
-                            Fat = Math.Round((item.Food.fats * item.Grams) / 100, 1),
-                            Carbs = Math.Round((item.Food.carbs * item.Grams) / 100, 1)
-                        }).ToList()
-                    };
-                });
-
-            var dailySummary = new
-            {
-                Date = date.ToString("yyyy-MM-dd"),
-                Meals = report,
-                DayTotal = new
-                {
-                    Calories = Math.Round(logs.Sum(i => (i.Food.calories * i.Grams) / 100), 1),
-                    Protein = Math.Round(logs.Sum(i => (i.Food.protein * i.Grams) / 100), 1),
-                    Fat = Math.Round(logs.Sum(i => (i.Food.fats * i.Grams) / 100), 1),
-                    Carbs = Math.Round(logs.Sum(i => (i.Food.carbs * i.Grams) / 100), 1)
-                }
-            };
-
-                return Ok(dailySummary);
+            var dailySummary = await _mealLogService.GetDailyStatsAsync(currentUserId,date);
+            return Ok(dailySummary);
         }
 
         [Authorize(Roles = "Admin")]
@@ -140,53 +79,26 @@ namespace CaloriesTracker.Controllers
             return Ok(result);
         }
 
+        // POST
+
         [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> AddNewItem([FromBody] Foods newItem)
         {
-            await _context.Foods.AddAsync(newItem);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetItemById), new { id = newItem.Id }, newItem);
+            var createdItem = await _foodService.AddNewItemAsync(newItem);
+            return CreatedAtAction(nameof(GetItemById), new { id = createdItem.Id }, createdItem);
         }
-        private double ParseNutritionValue(string description,string key)
-        {
-            var match = Regex.Match(description, $@"{key}:\s*([\d\.]+)", RegexOptions.IgnoreCase);
 
-            if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double value))
-            {
-                return value;
-            }
-            return 0;
-        }
 
         [Authorize(Roles = "Admin")]
         [HttpPost("import")]
         public async Task<IActionResult> ImportExternalFood([FromBody] ExternalFoodDto dto)
         {
-            var existingFood = await _context.Foods.FirstOrDefaultAsync(f => f.name.ToLower() == dto.Name.ToLower());
+            var newLocalFood = await _foodApiService.ImportExternalFoodAsync(dto);
 
-            if (existingFood != null)
-            {
-                return Conflict(new { message = "This product is already exist in out database" });
+            if (newLocalFood == null) {
+                return Conflict(new { message = "This product is already exist in db" });
             }
-
-            double cal = ParseNutritionValue(dto.Description, "Calories");
-            double p = ParseNutritionValue(dto.Description, "Protein");
-            double f = ParseNutritionValue(dto.Description, "Fat");
-            double c = ParseNutritionValue(dto.Description, "Carbs");
-
-            var newLocalFood = new Foods
-            {
-                name = dto.Name,
-                calories = Convert.ToInt32(cal),
-                protein = Convert.ToInt32(p),
-                fats = Convert.ToInt32(f),
-                carbs = Convert.ToInt32(c)
-
-            };
-
-            await _context.Foods.AddAsync(newLocalFood);
-            await _context.SaveChangesAsync();
 
             return Ok(newLocalFood);
         }
@@ -195,119 +107,63 @@ namespace CaloriesTracker.Controllers
         public async Task<IActionResult> AddMealToLog([FromBody] AddMealDto request)
         {
             var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-            if(userIdClaim == null)
-            {
-                return Unauthorized("Unauthorized!");
-            }
+            if (userIdClaim == null) return Unauthorized("Unauthorized!");
             int currentUserId = int.Parse(userIdClaim.Value);
 
-            var searchTerm = request.FoodName.ToLower();
+            var result = await _mealLogService.AddMealToLogAsync(currentUserId, request);
 
-            var food = await _context.Foods.FirstOrDefaultAsync(f => f.name.ToLower() == searchTerm);
-
-            if (food == null)
+            if (result == null)
             {
-                var externalList = await _foodApiService.SearchFoodAsync(request.FoodName);
-                if (externalList == null || externalList.Count == 0)
-                {
-                    return NotFound();
-                }
-
-                await SaveExternalListToDb(externalList);
-
-                food = await _context.Foods.FirstOrDefaultAsync(f => f.name.ToLower() == searchTerm);
-
-                if (food == null)
-                {
-                    food = await _context.Foods.FirstOrDefaultAsync(f => f.name.ToLower().Contains(searchTerm));
-                }
+                return NotFound(new { Message = "Food not found in local or external database." });
             }
-
-            var newMealLog = new MealLog
-            {
-                UserId = currentUserId,
-                FoodId = food.Id,
-                Grams = request.Grams,
-                Type = request.MealType,
-                LogDate = request.LogDate
-            };
-
-            _context.mealLogs.Add(newMealLog);
-            await _context.SaveChangesAsync();
-
-            double actualCalories = (food.calories * request.Grams) / 100;
-            double actualProtein = (food.protein * request.Grams) / 100;
-            double actualFat = (food.fats * request.Grams) / 100;
-            double actualCarbs = (food.carbs * request.Grams) / 100;
 
             return Ok(new
             {
                 Message = "Meal added!",
                 Date = request.LogDate.ToString("yyyy-MM-dd"),
                 Meal = request.MealType.ToString(),
-                FoodLogged = food.name,
+                FoodLogged = result.FoodName,
                 Amount = $"{request.Grams}g",
                 CalculatedMacros = new
                 {
-                    Calories = Math.Round(actualCalories, 1),
-                    Protein = Math.Round(actualProtein, 1),
-                    Fat = Math.Round(actualFat, 1),
-                    Carbs = Math.Round(actualCarbs, 1)
+                    Calories = Math.Round(result.Calories, 1),
+                    Protein = Math.Round(result.Protein, 1),
+                    Fat = Math.Round(result.Fat, 1),
+                    Carbs = Math.Round(result.Carbs, 1)
                 }
             });
         }
+
+        // PUT & PATCH
 
         [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateItem(int id, [FromBody] Foods updatedItem)
         {
-            var food = await _context.Foods.FirstOrDefaultAsync(i => i.Id == id);
-            if (food == null)
-            {
-                return NotFound();
-            }
-            food.name = updatedItem.name;
-            food.calories = updatedItem.calories;
-            food.protein = updatedItem.protein;
-            food.fats = updatedItem.fats;
-            food.carbs = updatedItem.carbs;
-
-            await _context.SaveChangesAsync();
-            return NoContent();
+            var item = await _foodService.UpdateItemAsync(id, updatedItem);
+            if (item == null) return NotFound("Food not found");
+            return Ok(item);
         }
 
         [Authorize(Roles = "Admin")]
         [HttpPatch("{id}")]
-        public async Task<IActionResult> PatchItem(int id,[FromBody]JsonPatchDocument<Foods> patchedItem)
+        public async Task<IActionResult> PatchItem(int id, [FromBody] JsonPatchDocument<Foods> patchedItem)
         {
-            var food = await _context.Foods.FirstOrDefaultAsync(i => i.Id == id);
-            if(food == null)
-            {
-                return NotFound();
-            }
-
-            patchedItem.ApplyTo(food, ModelState);
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest();
-            }
-            await _context.SaveChangesAsync();
-            return NoContent();
+            var item = await _foodService.PatchItemAsync(id, patchedItem);
+            if (item == null) return NotFound("Food not found");
+            return Ok(item);
         }
+
+
+        // DELETE
 
         [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteItem(int id)
         {
-            var food = await _context.Foods.FirstOrDefaultAsync(i => i.Id == id);
-            if (food == null)
-            {
-                return NotFound();
-            }
-            _context.Foods.Remove(food);
-            await _context.SaveChangesAsync();
-            return NoContent();
+            var isDeleted = await _foodService.DeleteItemAsync(id);
+            if (!isDeleted) return NotFound("Food not found");
+            return Ok(new { message = "Food successfully deleted" });
         }
 
         [HttpDelete("delete-meal/{logId}")]
@@ -317,28 +173,14 @@ namespace CaloriesTracker.Controllers
             if (userIdClaim == null) return Unauthorized();
             int currentUserId = int.Parse(userIdClaim.Value);
 
-            var mealLog = await _context.mealLogs
-                .FirstOrDefaultAsync(m => m.Id == logId && m.UserId == currentUserId);
+            bool isDeleted = await _mealLogService.DeleteMealLogAsync(currentUserId, logId);
 
-            if (mealLog == null)
+            if (!isDeleted)
             {
-                return NotFound(new { Message = "Not found!" });
+                return NotFound(new { Message = "Not found or you don't have permission!" });
             }
-
-            _context.mealLogs.Remove(mealLog);
-            await _context.SaveChangesAsync();
 
             return Ok(new { Message = "Product removed!" });
         }
-
-        // custom method to get and save list of objects from external api 
-        private async Task SaveExternalListToDb(List<ExternalFoodDto> externalList)
-        {
-            foreach (var externalItem in externalList)
-            {
-                await ImportExternalFood(externalItem);
-            }
-        }
-
     }
 }

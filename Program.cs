@@ -1,10 +1,13 @@
 using CaloriesTracker.DB;
-using CaloriesTracker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using CaloriesTracker.Services.FoodsServices;
+using CaloriesTracker.Services.AuthService;
+using CaloriesTracker.Services.WorkoutServices;
+using CaloriesTracker.Services.UserProfileServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,7 +52,13 @@ builder.Services.AddControllers();
 builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddOpenApi();
-builder.Services.AddHttpClient<IFoodApiService, FoodApiService>();
+builder.Services.AddScoped<IFoodApiService, ApiService>();
+builder.Services.AddScoped<IMealLogService, MealLogService>();
+builder.Services.AddScoped<IFoodService, FoodService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IWorkoutService, WorkoutService>();
+builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+builder.Services.AddHttpClient<IFoodApiService, ApiService>();
 
 var connection = builder.Configuration.GetConnectionString("Default");
 
