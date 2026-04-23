@@ -33,12 +33,12 @@ This project demonstrates the use of relational databases, integration with thir
 
 ### 🍎 Dashboard & Tracking
 <div align="center">
-  <p><b>Main Dashboard View</b></p>
-  <img src="https://github.com/user-attachments/assets/6d7a4a1e-6b3f-4c13-8531-3360063ad1e1" width="900" alt="Dashboard Main" />
+  <p><b>Calories Tracker</b></p>
+  <img width="1850" height="919" alt="image" src="https://github.com/user-attachments/assets/02529b86-4911-46c7-a55f-4fe614a9ab22" />
   
-  <p><b>Workout Tracking & History</b></p>
-  <img src="https://github.com/user-attachments/assets/67d89653-a155-4268-9f3d-921ec5b853f5" width="400" alt="Workout Mobile View" />
-  <img src="https://github.com/user-attachments/assets/330a9ab8-b68d-49c8-bcca-c2b120475dc1" width="900" alt="Dashboard Statistics" />
+  <p><b>Workout Tracking</b></p>
+<img width="1849" height="914" alt="image" src="https://github.com/user-attachments/assets/ea908f06-f6f9-495c-ac54-72c15b0db60f" />
+
 </div>
 
 ## 🛠️ How to Run Locally
