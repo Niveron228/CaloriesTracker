@@ -37,6 +37,13 @@ namespace CaloriesTracker.Controllers
             return Ok(exercises);
         }
 
+        [HttpGet("exercise-max-weights")]
+        public async Task<IActionResult> GetExerciseMaxWeights()
+        {
+            var maxWeights = await _workoutService.GetExerciseMaxWeightsAsync(GetCurrentUserId());
+            return Ok(maxWeights);
+        }
+
 
         [HttpGet("history/{date}")]
         public async Task<IActionResult> GetWorkoutByDate(DateTime date)

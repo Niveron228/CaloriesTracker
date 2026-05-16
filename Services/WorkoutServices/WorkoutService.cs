@@ -27,6 +27,21 @@ namespace CaloriesTracker.Services.WorkoutServices
                 .ToListAsync();
         }
 
+        public async Task<List<ExerciseMaxWeightDto>> GetExerciseMaxWeightsAsync(int userId)
+        {
+            return await _context.workoutsSet
+                .Include(s => s.Exercise)
+                .Where(s => s.Workout.UserId == userId)
+                .GroupBy(s => s.ExerciseId)
+                .Select(g => new ExerciseMaxWeightDto
+                {
+                    ExerciseId = g.Key,
+                    ExerciseName = g.Select(s => s.Exercise.Name).FirstOrDefault(),
+                    MaxWeight = g.Max(s => s.Weight)
+                })
+                .ToListAsync();
+        }
+
         public async Task<int> AddSetAsync(int userId, AddWorkoutSetDto request)
         {
             int finalExerciseId;
